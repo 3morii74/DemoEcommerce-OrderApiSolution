@@ -16,9 +16,10 @@ namespace OrderApi.Application.Services
     {
         public async Task<ProductDTO> GetProduct(int productId)
         {
-            var getProduct = await httpClient.GetAsync($"/api/prodcuts/{productId}");
+            var getProduct = await httpClient.GetAsync($"/api/products/{productId}");
             if (!getProduct.IsSuccessStatusCode)
             {
+                // Log the error or handle it appropriately
                 return null!;
             }
             var product = await getProduct.Content.ReadFromJsonAsync<ProductDTO>();
@@ -27,9 +28,10 @@ namespace OrderApi.Application.Services
 
         public async Task<AppUserDTO> GetUser(int userId)
         {
-            var getUser = await httpClient.GetAsync($"/api/prodcuts/{userId}");
+            var getUser = await httpClient.GetAsync($"/api/users/{userId}");
             if (!getUser.IsSuccessStatusCode)
             {
+                // Handle the case where the user is not found
                 return null!;
             }
             var user = await getUser.Content.ReadFromJsonAsync<AppUserDTO>();
@@ -40,7 +42,7 @@ namespace OrderApi.Application.Services
         {
             // Prepare Order
             var order = await orderInterface.FindByIdAsync(orderId);
-            if (order is null || order!.Id <= 0)
+            if (order is null || order.Id <= 0)
                 return null!;
 
             // Get Retry pipeline
@@ -48,25 +50,26 @@ namespace OrderApi.Application.Services
 
             // Prepare Product
             var productDTO = await retryPipeline.ExecuteAsync(async token => await GetProduct(order.ProductId));
+            if (productDTO is null)
+                return null!;
 
-            // Prepare Client
+            // Prepare Client (allowed to be null)
             var appUserDTO = await retryPipeline.ExecuteAsync(async token => await GetUser(order.ClientId));
 
-            // Populate order Details
+            // Populate order Details (handle null appUserDTO)
             return new OrderDetailsDTO(
-                order.Id,
-                productDTO.Id,
-                appUserDTO.Id,
-                appUserDTO.Name,
-                appUserDTO.Email,
-                appUserDTO.Address,
-                appUserDTO.TelephoneNumber,
-                productDTO.Name,
-                order.PurchaseQuantity,
-                productDTO.Price,
-                productDTO.Quantity * order.PurchaseQuantity,
-                order.OrderedDate
-            );
+                 order.Id,
+                 productDTO.Id,
+                 appUserDTO?.Id,          // Null-safe access
+                 appUserDTO?.Email,
+                 appUserDTO?.Address,
+                 appUserDTO?.TelephoneNumber,
+                 productDTO.Name,
+                 order.PurchaseQuantity,
+                 productDTO.Price,
+                 productDTO.Quantity * order.PurchaseQuantity,
+                 order.OrderedDate // Fix typo: "UnderedDate" → "OrderedDate"
+                );
         }
 
         // GET ORDERS BY CLIENT ID
